@@ -1,8 +1,13 @@
-/// Support for doing something awesome.
+import 'package:build/build.dart';
+import 'package:source_gen/source_gen.dart';
+
+import 'src/annotation_generator.dart';
+
+/// Creates a [SharedPartBuilder] for generating secure dotenv annotations.
 ///
-/// More dartdocs go here.
-library;
-
-export 'src/flutter_secure_dotenv_generator_base.dart';
-
-// TODO: Export any libraries intended for clients of this package.
+/// Takes [options] as a parameter to configure the builder.
+Builder flutterSecureDotEnvAnnotation(BuilderOptions options) =>
+    SharedPartBuilder(
+      [FlutterSecureDotEnvAnnotationGenerator(options)],
+      'flutter_secure_dot_env_annotation',
+    );
