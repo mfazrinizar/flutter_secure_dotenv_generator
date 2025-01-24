@@ -10,3 +10,7 @@
 ## 1.0.2
 
 - Fix building issue
+
+## 1.0.3
+
+- Fix FormatterException caused by dart.core type prefix

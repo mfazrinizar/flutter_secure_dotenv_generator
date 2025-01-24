@@ -99,7 +99,7 @@ abstract class Field<T> {
     if (identifier == null) return null;
 
     for (final e in _element.library.importedLibraries) {
-      if (e.identifier != identifier) continue;
+      if (e.library.identifier != identifier) continue;
       return e.name;
     }
     return null;
@@ -109,6 +109,9 @@ abstract class Field<T> {
   String typeWithPrefix({required bool withNullability}) {
     final typePrefix = this.typePrefix;
     final type = this.type.getDisplayString();
+    if (typePrefix == 'dart.core') {
+      return type;
+    }
     return '${typePrefix != null ? '$typePrefix.' : ''}$type';
   }
 
@@ -268,7 +271,7 @@ class EnumField extends Field<String> {
   String? valueAsString() {
     final value = parseValue();
     if (value == null) return null;
-    return '${typeWithPrefix(withNullability: false)}.$value';
+    return '${typeWithPrefix(withNullability: true)}.$value';
   }
 }
 
