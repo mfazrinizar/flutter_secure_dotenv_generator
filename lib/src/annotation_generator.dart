@@ -14,7 +14,7 @@ import 'package:source_gen/source_gen.dart';
 import 'fields.dart';
 
 /// Logger instance for the secure dotenv generator.
-final logger = Logger('secure_dotenv_generator:secure_dotenv');
+final logger = Logger('flutter_secure_dotenv_generator:flutter_secure_dotenv');
 
 /// A generator for the `@DotEnvGen` annotation.
 class FlutterSecureDotEnvAnnotationGenerator

@@ -6,3 +6,7 @@
 ## 1.0.1
 
 - Minor typo fixes
+
+## 1.0.2
+
+- Fix building issue
