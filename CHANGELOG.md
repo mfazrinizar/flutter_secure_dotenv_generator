@@ -14,3 +14,7 @@
 ## 1.0.3
 
 - Fix FormatterException caused by dart.core type prefix
+
+## 1.0.4
+
+- Fix building without encryption

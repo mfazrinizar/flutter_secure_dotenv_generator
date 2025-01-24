@@ -5,7 +5,7 @@ targets:
         enabled: true
 
 builders:
-  secure_dotenv:
+  flutter_secure_dotenv:
     target: ":flutter_secure_dotenv_generator"
     import: "package:flutter_secure_dotenv_generator/flutter_secure_dotenv_generator.dart"
     builder_factories: ["flutterSecureDotEnvAnnotation"]
