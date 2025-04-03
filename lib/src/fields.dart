@@ -112,7 +112,7 @@ abstract class Field<T> {
     if (typePrefix == 'dart.core') {
       return type;
     }
-    return '${typePrefix != null ? '$typePrefix.' : ''}$type';
+    return '${typePrefix?.isNotEmpty ?? false ? '$typePrefix.' : ''}$type';
   }
 
   /// Checks if the field is nullable.
