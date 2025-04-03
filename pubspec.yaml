@@ -2,7 +2,7 @@ repository: https://github.com/mfazrinizar/flutter_secure_dotenv_generator
 name: flutter_secure_dotenv_generator
 description: A development dependency to generate secure dotenv file for flutter_secure_dotenv package.
 
-version: 1.0.4
+version: 1.0.5
 
 environment:
   sdk: ^3.6.0

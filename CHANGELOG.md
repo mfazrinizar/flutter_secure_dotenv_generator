@@ -18,3 +18,7 @@
 ## 1.0.4
 
 - Fix building without encryption
+
+## 1.0.5
+
+- Fix enum typePrefix empty building issue
