@@ -1,0 +1,7 @@
+# Files to exclude from pub.dev publishing.
+# See https://dart.dev/go/pubignore
+
+.dart_tool/
+pubspec.lock
+.vscode/
+pubspec_overrides.yaml
