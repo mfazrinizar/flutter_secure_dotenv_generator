@@ -20,7 +20,8 @@ final logger = Logger('flutter_secure_dotenv_generator:flutter_secure_dotenv');
 class FlutterSecureDotEnvAnnotationGenerator
     extends GeneratorForAnnotation<DotEnvGen> {
   /// Creates an instance of [FlutterSecureDotEnvAnnotationGenerator].
-  const FlutterSecureDotEnvAnnotationGenerator(this.options);
+  const FlutterSecureDotEnvAnnotationGenerator(this.options)
+    : super(inPackage: 'flutter_secure_dotenv');
 
   /// The options for the builder.
   final BuilderOptions options;
@@ -41,15 +42,20 @@ class FlutterSecureDotEnvAnnotationGenerator
     });
     if (constructor == null) {
       throw Exception(
-          '@DotEnvGen annotation requires a const $className._() or private constructor');
+        '@DotEnvGen annotation requires a const $className._() or private constructor',
+      );
     }
 
     final filename = annotation.read('filename').stringValue;
 
-    final fieldRenameName =
-        annotation.read('fieldRename').revive().accessor.split('.')[1];
-    final fieldRename =
-        FieldRename.values.firstWhere((v) => v.name == fieldRenameName);
+    final fieldRenameName = annotation
+        .read('fieldRename')
+        .revive()
+        .accessor
+        .split('.')[1];
+    final fieldRename = FieldRename.values.firstWhere(
+      (v) => v.name == fieldRenameName,
+    );
 
     var interface = getInterface(element);
     var library = await buildStep.inputLibrary;
@@ -59,33 +65,47 @@ class FlutterSecureDotEnvAnnotationGenerator
     final fields = <Field<dynamic>>[];
 
     // iterate through element fields, even inherited ones
+    // Filter out static / private fields (e.g. _encryptionKey, _iv) so they
+    // are not mistakenly treated as environment-variable accessors.
     final classFields = [
-      ...element.allSupertypes.expand((e) => e.element.fields).where(
-          (element) =>
-              !element.isStatic &&
-              !element.isPrivate &&
-              element.kind == ElementKind.FIELD &&
-              element.name != 'hashCode' &&
-              element.name != 'runtimeType'),
-      ...element.fields,
+      ...element.allSupertypes
+          .expand((e) => e.element.fields)
+          .where(
+            (element) =>
+                !element.isStatic &&
+                !element.isPrivate &&
+                element.kind == ElementKind.FIELD &&
+                element.name != 'hashCode' &&
+                element.name != 'runtimeType',
+          ),
+      ...element.fields.where(
+        (element) =>
+            !element.isStatic &&
+            !element.isPrivate &&
+            element.name != 'hashCode' &&
+            element.name != 'runtimeType',
+      ),
     ];
 
     for (final field in classFields) {
       final isAbstract = field.isAbstract || field.getter?.isAbstract == true;
 
-      final annotation =
-          fieldAnnotations.firstWhereOrNull((e) => e.name == field.name);
+      final annotation = fieldAnnotations.firstWhereOrNull(
+        (e) => e.name == field.name,
+      );
       final parsingName = annotation?.nameOverride;
       final defaultValue = annotation?.defaultValue;
 
       try {
-        fields.add(Field.of(
-          element: field,
-          rename: fieldRename,
-          nameOverride: parsingName,
-          defaultValue: defaultValue,
-          values: values,
-        ));
+        fields.add(
+          Field.of(
+            element: field,
+            rename: fieldRename,
+            nameOverride: parsingName,
+            defaultValue: defaultValue,
+            values: values,
+          ),
+        );
       } on UnsupportedError catch (e) {
         if (isAbstract) rethrow;
         logger.warning(e.message);
@@ -96,7 +116,8 @@ class FlutterSecureDotEnvAnnotationGenerator
     var initializationVector = options.config['IV'] as String?;
     final outputFile = options.config['OUTPUT_FILE'] as String?;
 
-    final isEncrypted = ((encryptionKey?.isNotEmpty ?? false) &&
+    final isEncrypted =
+        ((encryptionKey?.isNotEmpty ?? false) &&
             (initializationVector?.isNotEmpty ?? false)) ||
         (outputFile?.isNotEmpty ?? false);
 
@@ -134,11 +155,7 @@ class FlutterSecureDotEnvAnnotationGenerator
       }
 
       final jsonEncoded = jsonEncode(Map.fromEntries(entries));
-      final encryptedJson = AESCBCEncrypter.aesCbcEncrypt(
-        key,
-        iv,
-        jsonEncoded,
-      );
+      final encryptedJson = AESCBCEncrypter.aesCbcEncrypt(key, iv, jsonEncoded);
       String encryptedValues;
 
       encryptedValues =
