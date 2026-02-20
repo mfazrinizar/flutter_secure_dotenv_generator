@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+# flutter_secure_dotenv ^2.0.0 is not yet on pub.dev. We check out its
+# matching branch and generate a pubspec_overrides.yaml that redirects
+# the hosted dependency to the local checkout.
+#
+# Once flutter_secure_dotenv is published, simplify back to a single
+# checkout and remove the override steps.
+#
+# Push order: flutter_secure_dotenv first, then this repo.
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: flutter_secure_dotenv_generator
+      - uses: actions/checkout@v4
+        with:
+          repository: mfazrinizar/flutter_secure_dotenv
+          ref: ${{ github.base_ref || github.ref_name }}
+          path: flutter_secure_dotenv
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - name: Override flutter_secure_dotenv to local path
+        shell: bash
+        run: |
+          cat > pubspec_overrides.yaml << 'EOF'
+          dependency_overrides:
+            flutter_secure_dotenv:
+              path: ../flutter_secure_dotenv
+          EOF
+        working-directory: flutter_secure_dotenv_generator
+      - run: dart pub get
+        working-directory: flutter_secure_dotenv_generator
+      - run: dart format --set-exit-if-changed .
+        working-directory: flutter_secure_dotenv_generator
+      - run: dart analyze --fatal-infos
+        working-directory: flutter_secure_dotenv_generator
+
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        sdk: [stable, "3.8.0"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: flutter_secure_dotenv_generator
+      - uses: actions/checkout@v4
+        with:
+          repository: mfazrinizar/flutter_secure_dotenv
+          ref: ${{ github.base_ref || github.ref_name }}
+          path: flutter_secure_dotenv
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: ${{ matrix.sdk }}
+      - name: Override flutter_secure_dotenv to local path
+        shell: bash
+        run: |
+          cat > pubspec_overrides.yaml << 'EOF'
+          dependency_overrides:
+            flutter_secure_dotenv:
+              path: ../flutter_secure_dotenv
+          EOF
+        working-directory: flutter_secure_dotenv_generator
+      - run: dart pub get
+        working-directory: flutter_secure_dotenv_generator
+      - run: dart test
+        working-directory: flutter_secure_dotenv_generator
+
+  dry-run:
+    name: Publish Dry Run
+    runs-on: ubuntu-latest
+    needs: [analyze, test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: flutter_secure_dotenv_generator
+      - uses: actions/checkout@v4
+        with:
+          repository: mfazrinizar/flutter_secure_dotenv
+          ref: main
+          path: flutter_secure_dotenv
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - name: Override flutter_secure_dotenv to local path
+        shell: bash
+        run: |
+          cat > pubspec_overrides.yaml << 'EOF'
+          dependency_overrides:
+            flutter_secure_dotenv:
+              path: ../flutter_secure_dotenv
+          EOF
+        working-directory: flutter_secure_dotenv_generator
+      - run: dart pub get
+        working-directory: flutter_secure_dotenv_generator
+      - run: dart pub publish --dry-run
+        working-directory: flutter_secure_dotenv_generator
+
+  pana:
+    name: Package Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: flutter_secure_dotenv_generator
+      - uses: actions/checkout@v4
+        with:
+          repository: mfazrinizar/flutter_secure_dotenv
+          ref: ${{ github.base_ref || github.ref_name }}
+          path: flutter_secure_dotenv
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - run: dart pub global activate pana
+      - name: Override flutter_secure_dotenv to local path
+        shell: bash
+        run: |
+          cat > pubspec_overrides.yaml << 'EOF'
+          dependency_overrides:
+            flutter_secure_dotenv:
+              path: ../flutter_secure_dotenv
+          EOF
+        working-directory: flutter_secure_dotenv_generator
+      - run: dart pub get
+        working-directory: flutter_secure_dotenv_generator
+      - run: dart pub global run pana --no-warning .
+        working-directory: flutter_secure_dotenv_generator
