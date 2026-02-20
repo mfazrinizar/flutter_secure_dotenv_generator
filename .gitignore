@@ -9,3 +9,7 @@ pubspec.lock
 .vscode/
 
 .env*
+!example/.env
+
+# Local development overrides
+pubspec_overrides.yaml

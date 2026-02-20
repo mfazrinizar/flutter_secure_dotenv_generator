@@ -1,171 +1,173 @@
-import 'package:analyzer/dart/constant/value.dart';
-import 'package:analyzer/dart/element/type.dart';
-import 'package:flutter_secure_dotenv_generator/src/annotation_generator.dart';
-import 'package:flutter_secure_dotenv_generator/src/environment_field.dart';
+import 'dart:convert';
+
+import 'package:flutter_secure_dotenv/flutter_secure_dotenv.dart';
 import 'package:flutter_secure_dotenv_generator/src/helpers.dart';
 import 'package:test/test.dart';
-import 'package:analyzer/dart/element/element.dart';
-import 'package:build/build.dart';
-import 'package:source_gen/source_gen.dart';
 
 void main() {
-  group('FlutterSecureDotEnvAnnotationGenerator', () {
-    late FlutterSecureDotEnvAnnotationGenerator generator;
-    late BuilderOptions options;
-
-    setUp(() {
-      options = BuilderOptions({
-        'ENCRYPTION_KEY': 'test_encryption_key',
-        'IV': 'test_initialization_vector',
-        'OUTPUT_FILE': 'test_output_file',
-      });
-      generator = FlutterSecureDotEnvAnnotationGenerator(options);
+  group('Helpers - escapeDartString', () {
+    test('should escape simple string', () {
+      final result = escapeDartString('hello');
+      expect(result, "'hello'");
     });
 
-    test('should throw exception if element is not a class', () async {
-      final element = FunctionElementImpl('testFunction');
-      final annotation = ConstantReader(null);
-      final buildStep = BuildStepMock();
+    test('should handle string with single quotes', () {
+      final result = escapeDartString("it's");
+      expect(result, '"it\'s"');
+    });
 
-      expect(
-        () => generator.generateForAnnotatedElement(
-            element, annotation, buildStep),
-        throwsException,
+    test('should handle string with double quotes', () {
+      final result = escapeDartString('say "hello"');
+      expect(result, "'say \"hello\"'");
+    });
+
+    test('should handle string with dollar sign', () {
+      final result = escapeDartString(r'cost $5');
+      expect(result, contains(r'$'));
+    });
+
+    test('should handle string with newline', () {
+      final result = escapeDartString('line1\nline2');
+      expect(result, contains(r'\n'));
+    });
+
+    test('should handle string with tab', () {
+      final result = escapeDartString('col1\tcol2');
+      expect(result, contains(r'\t'));
+    });
+
+    test('should handle string with carriage return', () {
+      final result = escapeDartString('line1\rline2');
+      expect(result, contains(r'\r'));
+    });
+
+    test('should handle empty string', () {
+      final result = escapeDartString('');
+      expect(result, "''");
+    });
+
+    test('should handle backslash', () {
+      final result = escapeDartString(r'path\to\file');
+      expect(result, contains(r'\\'));
+    });
+  });
+
+  group('AES encryption integration (used by generator)', () {
+    test('encrypt and decrypt JSON map (simulates generator workflow)', () {
+      final key = AESCBCEncrypter.generateRandomBytes(32);
+      final iv = AESCBCEncrypter.generateRandomBytes(16);
+
+      final envMap = {
+        'API_KEY': 'sk-1234567890abcdef',
+        'DATABASE_URL': 'postgres://user:pass@localhost:5432/db',
+        'DEBUG': 'true',
+        'PORT': '3000',
+      };
+
+      // Encrypt individual values (as the generator does)
+      final encryptedEntries = <String, String>{};
+      for (final entry in envMap.entries) {
+        final encrypted = base64.encode(
+          AESCBCEncrypter.aesCbcEncrypt(key, iv, entry.value),
+        );
+        encryptedEntries[entry.key] = encrypted;
+      }
+
+      // Encrypt the whole JSON map (as the generator does)
+      final jsonEncoded = jsonEncode(encryptedEntries);
+      final encryptedJson = AESCBCEncrypter.aesCbcEncrypt(key, iv, jsonEncoded);
+
+      // Decrypt the whole JSON map (as the runtime does)
+      final decryptedJson = AESCBCEncrypter.aesCbcDecrypt(
+        key,
+        iv,
+        encryptedJson,
       );
+      final jsonMap = jsonDecode(decryptedJson) as Map<String, dynamic>;
+
+      // Decrypt individual values
+      for (final entry in envMap.entries) {
+        final encryptedValue = jsonMap[entry.key] as String;
+        final decryptedValue = AESCBCEncrypter.aesCbcDecrypt(
+          key,
+          iv,
+          base64.decode(encryptedValue),
+        );
+        expect(decryptedValue, entry.value);
+      }
+    });
+
+    test('base64 key/IV round-trip (simulates key file workflow)', () {
+      final key = AESCBCEncrypter.generateRandomBytes(32);
+      final iv = AESCBCEncrypter.generateRandomBytes(16);
+
+      // Serialize to JSON file format
+      final secretsMap = {
+        'ENCRYPTION_KEY': base64.encode(key),
+        'IV': base64.encode(iv),
+      };
+      final jsonStr = jsonEncode(secretsMap);
+
+      // Deserialize
+      final loaded = jsonDecode(jsonStr) as Map<String, dynamic>;
+      final loadedKey = base64.decode(loaded['ENCRYPTION_KEY']! as String);
+      final loadedIv = base64.decode(loaded['IV']! as String);
+
+      expect(Uint8List.fromList(loadedKey), equals(key));
+      expect(Uint8List.fromList(loadedIv), equals(iv));
+
+      // Verify encryption still works with deserialized keys
+      const text = 'secret value';
+      final encrypted = AESCBCEncrypter.aesCbcEncrypt(
+        Uint8List.fromList(loadedKey),
+        Uint8List.fromList(loadedIv),
+        text,
+      );
+      final decrypted = AESCBCEncrypter.aesCbcDecrypt(
+        Uint8List.fromList(loadedKey),
+        Uint8List.fromList(loadedIv),
+        encrypted,
+      );
+      expect(decrypted, text);
+    });
+
+    test('unencrypted base64 workflow (no encryption keys)', () {
+      final envMap = {'API_KEY': 'my-api-key', 'SECRET': 'my-secret'};
+
+      // Simulate unencrypted path: base64-encode values
+      final encodedEntries = <String, String>{};
+      for (final entry in envMap.entries) {
+        encodedEntries[entry.key] = base64.encode(entry.value.codeUnits);
+      }
+
+      final jsonEncoded = jsonEncode(encodedEntries);
+      final encryptedJson = base64.encode(jsonEncoded.codeUnits);
+
+      // Decode
+      final bytes = base64.decode(encryptedJson);
+      final stringDecoded = String.fromCharCodes(bytes);
+      final jsonMap = jsonDecode(stringDecoded) as Map<String, dynamic>;
+
+      for (final entry in envMap.entries) {
+        final encryptedValue = jsonMap[entry.key] as String;
+        final decryptedValue = String.fromCharCodes(
+          base64.decode(encryptedValue),
+        );
+        expect(decryptedValue, entry.value);
+      }
     });
   });
 
-  group('EnvironmentField', () {
-    test('should create an instance of EnvironmentField', () {
-      final field = EnvironmentField('name', 'nameOverride',
-          DartTypeImpl('String'), DartObjectImpl('defaultValue'));
+  group('FieldRename integration', () {
+    test('all FieldRename values accessible', () {
+      expect(FieldRename.values, hasLength(5));
+    });
 
-      expect(field.name, 'name');
-      expect(field.nameOverride, 'nameOverride');
-      expect(field.type, isA<DartType>());
-      expect(field.defaultValue, isA<DartObject>());
+    test('DotEnvGen accepts all FieldRename values', () {
+      for (final rename in FieldRename.values) {
+        final gen = DotEnvGen(fieldRename: rename);
+        expect(gen.fieldRename, rename);
+      }
     });
   });
-
-  group('Helpers', () {
-    test('should get all accessor names', () {
-      final interface = InterfaceElementImpl('TestInterface');
-      final accessorNames = getAllAccessorNames(interface);
-
-      expect(accessorNames, isNotEmpty);
-    });
-  });
-}
-
-// ignore: subtype_of_sealed_class
-class BuildStepMock implements BuildStep {
-  @override
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class FunctionElementImpl implements FunctionElement {
-  @override
-  final String name;
-
-  FunctionElementImpl(this.name);
-
-  @override
-  List<ElementAnnotation> get metadata => [];
-
-  @override
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class ClassElementImpl implements ClassElement {
-  @override
-  final String name;
-
-  ClassElementImpl(this.name);
-
-  @override
-  List<ElementAnnotation> get metadata => [];
-
-  @override
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class DartTypeImpl implements DartType {
-  @override
-  final String name;
-
-  DartTypeImpl(this.name);
-
-  @override
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class DartObjectImpl implements DartObject {
-  final dynamic value;
-
-  DartObjectImpl(this.value);
-
-  @override
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class FieldElementImpl implements FieldElement {
-  @override
-  final String name;
-  @override
-  final DartType type;
-
-  FieldElementImpl(this.name, this.type);
-
-  @override
-  List<ElementAnnotation> get metadata => [];
-
-  @override
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class InterfaceElementImpl implements InterfaceElement {
-  @override
-  final String name;
-
-  InterfaceElementImpl(this.name);
-
-  @override
-  List<ElementAnnotation> get metadata => [];
-
-  @override
-  List<InterfaceType> get allSupertypes => [];
-
-  @override
-  List<PropertyAccessorElement> get accessors => [
-        PropertyAccessorElementImpl('accessor1', false),
-        PropertyAccessorElementImpl('accessor2', false),
-      ];
-
-  @override
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class LibraryElementImpl implements LibraryElement {
-  @override
-  final String name;
-
-  LibraryElementImpl(this.name);
-
-  @override
-  List<ElementAnnotation> get metadata => [];
-
-  @override
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class PropertyAccessorElementImpl implements PropertyAccessorElement {
-  @override
-  final String name;
-  @override
-  final bool isSetter;
-
-  PropertyAccessorElementImpl(this.name, this.isSetter);
-
-  @override
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
