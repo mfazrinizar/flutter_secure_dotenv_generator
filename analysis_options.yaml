@@ -23,9 +23,12 @@ linter:
   rules:
     - public_member_api_docs
 
-# analyzer:
-#   exclude:
-#     - path/to/excluded/files/**
+analyzer:
+  exclude:
+    # The example references env.g.dart which is produced by build_runner.
+    # Without running the generator the file doesn't exist, causing
+    # uri_has_not_been_generated errors during static analysis.
+    - example/**
 
 # For more information about the core and recommended set of lints, see
 # https://dart.dev/go/core-lints
