@@ -83,7 +83,7 @@ const _escapeMap = {
   '\f': r'\f', // 0C - form feed
   '\r': r'\r', // 0D - carriage return
   '\x7F': r'\x7F', // delete
-  r'\': r'\\' // backslash
+  r'\': r'\\', // backslash
 };
 
 /// Given single-character string, return the hex-escaped equivalent.
@@ -117,13 +117,16 @@ Set<String> getAllAccessorNames(InterfaceElement interface) {
 
   var supertypes = interface.allSupertypes.map((it) => it.element);
   for (var type in [interface, ...supertypes]) {
-    for (var accessor in type.accessors) {
-      if (accessor.isSetter) {
-        var name = accessor.name;
-        accessorNames.add(name.substring(0, name.length - 1));
-      } else {
-        accessorNames.add(accessor.name);
+    for (var getter in type.getters) {
+      accessorNames.add(getter.name!);
+    }
+    for (var setter in type.setters) {
+      var name = setter.name!;
+      // Setter names end with '=', strip it
+      if (name.endsWith('=')) {
+        name = name.substring(0, name.length - 1);
       }
+      accessorNames.add(name);
     }
   }
 
@@ -135,40 +138,45 @@ Set<String> getAllAccessorNames(InterfaceElement interface) {
 /// This method looks up all the getters and setters in the [interface] and
 /// retrieves their annotations to create a list of [EnvironmentField]s.
 List<EnvironmentField> getAccessors(
-    InterfaceElement interface, LibraryElement library) {
+  InterfaceElement interface,
+  LibraryElement library,
+) {
   var accessorNames = getAllAccessorNames(interface);
 
   var getters = <EnvironmentField>[];
   var setters = <EnvironmentField>[];
   for (var name in accessorNames) {
-    var getter = interface.augmented.lookUpGetter(name: name, library: library);
+    var getter = interface.lookUpGetter(name: name, library: library);
     if (getter != null) {
       var getterAnn =
-          getFieldAnnotation(getter.variable2!) ?? getFieldAnnotation(getter);
+          getFieldAnnotation(getter.variable) ?? getFieldAnnotation(getter);
       if (getterAnn != null) {
-        var field = getter.variable2!;
-        getters.add(EnvironmentField(
-          field.name,
-          getterAnn.name,
-          field.type,
-          getterAnn.defaultValue,
-        ));
+        var field = getter.variable;
+        getters.add(
+          EnvironmentField(
+            field.name!,
+            getterAnn.name,
+            field.type,
+            getterAnn.defaultValue,
+          ),
+        );
       }
     }
 
-    var setter =
-        interface.augmented.lookUpSetter(name: '$name=', library: library);
+    var setter = interface.lookUpSetter(name: '$name=', library: library);
     if (setter != null) {
       var setterAnn =
-          getFieldAnnotation(setter.variable2!) ?? getFieldAnnotation(setter);
+          getFieldAnnotation(setter.variable) ?? getFieldAnnotation(setter);
       if (setterAnn != null) {
-        var field = setter.variable2!;
-        setters.add(EnvironmentField(
-          field.name,
-          setterAnn.name,
-          field.type,
-          setterAnn.defaultValue,
-        ));
+        var field = setter.variable;
+        setters.add(
+          EnvironmentField(
+            field.name!,
+            setterAnn.name,
+            field.type,
+            setterAnn.defaultValue,
+          ),
+        );
       }
     }
   }

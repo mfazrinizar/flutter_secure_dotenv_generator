@@ -7,16 +7,14 @@ import 'package:flutter_secure_dotenv/flutter_secure_dotenv.dart';
 import 'package:source_gen/source_gen.dart';
 import 'package:source_helper/source_helper.dart';
 
-final _fieldKeyChecker = const TypeChecker.fromRuntime(FieldKey);
+const _fieldKeyChecker = TypeChecker.fromUrl(
+  'package:flutter_secure_dotenv/flutter_secure_dotenv.dart#FieldKey',
+);
 
 /// Abstract class representing a field with its associated metadata.
 abstract class Field<T> {
   /// Creates an instance of [Field].
-  const Field(
-    this._element,
-    this.jsonKey,
-    this.value,
-  );
+  const Field(this._element, this.jsonKey, this.value);
 
   /// Factory method to create a [Field] instance based on the type of the field.
   static Field<dynamic> of({
@@ -49,7 +47,8 @@ abstract class Field<T> {
     }
 
     throw UnsupportedError(
-        'Unsupported type for ${element.enclosingElement3.name}.$jsonKey: $type');
+      'Unsupported type for ${element.enclosingElement.name}.$jsonKey: $type',
+    );
   }
 
   /// Returns the JSON key for the given [element] based on the [rename] strategy and [nameOverride].
@@ -58,7 +57,7 @@ abstract class Field<T> {
     FieldRename rename,
     String? nameOverride,
   ) {
-    final key = element.name;
+    final key = element.name!;
     String jsonKey;
 
     switch (rename) {
@@ -98,9 +97,11 @@ abstract class Field<T> {
     final identifier = type.element?.library?.identifier;
     if (identifier == null) return null;
 
-    for (final e in _element.library.importedLibraries) {
-      if (e.library.identifier != identifier) continue;
-      return e.name;
+    for (final import in _element.library.firstFragment.libraryImports) {
+      final importedLib = import.importedLibrary;
+      if (importedLib == null) continue;
+      if (importedLib.identifier != identifier) continue;
+      return import.prefix?.element.name;
     }
     return null;
   }
@@ -151,11 +152,7 @@ abstract class Field<T> {
 /// A class representing a string field.
 class StringField extends Field<String> {
   /// Creates an instance of [StringField].
-  const StringField(
-    super.element,
-    super.name,
-    super.value,
-  );
+  const StringField(super.element, super.name, super.value);
 
   @override
   String? parseValue() => value;
@@ -169,11 +166,7 @@ class StringField extends Field<String> {
 /// A class representing an integer field.
 class IntField extends Field<int> {
   /// Creates an instance of [IntField].
-  const IntField(
-    super.element,
-    super.name,
-    super.value,
-  );
+  const IntField(super.element, super.name, super.value);
 
   @override
   int? parseValue() {
@@ -185,11 +178,7 @@ class IntField extends Field<int> {
 /// A class representing a double field.
 class DoubleField extends Field<double> {
   /// Creates an instance of [DoubleField].
-  const DoubleField(
-    super.element,
-    super.name,
-    super.value,
-  );
+  const DoubleField(super.element, super.name, super.value);
 
   @override
   double? parseValue() {
@@ -201,11 +190,7 @@ class DoubleField extends Field<double> {
 /// A class representing a boolean field.
 class BoolField extends Field<bool> {
   /// Creates an instance of [BoolField].
-  const BoolField(
-    super.element,
-    super.name,
-    super.value,
-  );
+  const BoolField(super.element, super.name, super.value);
 
   @override
   bool? parseValue() {
@@ -230,18 +215,13 @@ class BoolField extends Field<bool> {
 /// A class representing an enum field.
 class EnumField extends Field<String> {
   /// Creates an instance of [EnumField].
-  const EnumField(
-    super.element,
-    super.name,
-    super.value,
-  );
+  const EnumField(super.element, super.name, super.value);
 
   @override
   String? parseValue() {
     if (value == null) return null;
 
-    final values = (type as InterfaceType)
-        .accessors
+    final values = (type as InterfaceType).getters
         .where((e) => e.returnType.isAssignableTo(type))
         .map((e) => e.name);
     if (!values.contains(value)) {
@@ -278,10 +258,7 @@ class EnumField extends Field<String> {
 /// A class representing field information.
 class FieldInfo {
   /// Creates an instance of [FieldInfo].
-  FieldInfo(
-    this.name,
-    this.defaultValue,
-  );
+  FieldInfo(this.name, this.defaultValue);
 
   /// The name of the field.
   final String? name;

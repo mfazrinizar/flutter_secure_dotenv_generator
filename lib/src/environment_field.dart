@@ -16,10 +16,5 @@ class EnvironmentField {
   final DartObject? defaultValue;
 
   /// Creates an instance of [EnvironmentField].
-  EnvironmentField(
-    this.name,
-    this.nameOverride,
-    this.type,
-    this.defaultValue,
-  );
+  EnvironmentField(this.name, this.nameOverride, this.type, this.defaultValue);
 }
