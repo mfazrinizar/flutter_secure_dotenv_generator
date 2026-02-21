@@ -1,3 +1,8 @@
+## 2.0.1
+
+- Bumped minimum Dart SDK from `^3.8.0` to `^3.9.0`.
+- Updated `source_helper` to `^1.3.10`.
+
 ## 2.0.0
 
 - **BREAKING**: Updated `source_gen` from `^2.0.0` to `^4.2.0` (addresses [#3](https://github.com/mfazrinizar/flutter_secure_dotenv_generator/issues/3)).
